@@ -20,24 +20,19 @@ const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1516188060591718661/ub
 function getClientIP(req: Request): string {
     const forwardedFor = req.headers.get('x-forwarded-for');
     const realIP = req.headers.get('x-real-ip');
-    
-    if (forwardedFor) {
-        return forwardedFor.split(',')[0].trim();
-    }
-    if (realIP) {
-        return realIP.trim();
-    }
+    if (forwardedFor) return forwardedFor.split(',')[0].trim();
+    if (realIP) return realIP.trim();
     return 'unknown';
 }
 
 async function sendDiscordLog(
-    model_key: string, 
-    prompt: string, 
-    response: string, 
-    userId?: string, 
+    model_key: string,
+    prompt: string,
+    response: string,
+    userId?: string,
     ip?: string,
-    durationMs?: number, 
-    success = true, 
+    durationMs?: number,
+    success = true,
     error?: string
 ) {
     try {
@@ -72,6 +67,20 @@ async function sendDiscordLog(
     }
 }
 
+// CORS Helper
+function corsHeaders() {
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+        'Access-Control-Allow-Credentials': 'true',
+    };
+}
+
+export async function OPTIONS() {
+    return new Response(null, { headers: corsHeaders() });
+}
+
 export async function POST(req: Request) {
     const startTime = Date.now();
     const clientIP = getClientIP(req);
@@ -80,11 +89,17 @@ export async function POST(req: Request) {
         const { model: model_key, prompt, userId } = await req.json();
 
         if (!model_key || !prompt) {
-            return Response.json({ error: "model and prompt are required" }, { status: 400 });
+            return Response.json({ error: "model and prompt are required" }, { 
+                status: 400,
+                headers: corsHeaders()
+            });
         }
 
         if (!MODELS[model_key]) {
-            return Response.json({ error: "Invalid model" }, { status: 400 });
+            return Response.json({ error: "Invalid model" }, { 
+                status: 400,
+                headers: corsHeaders()
+            });
         }
 
         const config = MODELS[model_key];
@@ -132,7 +147,7 @@ export async function POST(req: Request) {
             model: model_key,
             full_name: config.full_name,
             durationMs
-        });
+        }, { headers: corsHeaders() });
 
     } catch (error: any) {
         const durationMs = Date.now() - startTime;
@@ -144,6 +159,9 @@ export async function POST(req: Request) {
         return Response.json({
             success: false,
             error: errorMsg
-        }, { status: 500 });
+        }, { 
+            status: 500,
+            headers: corsHeaders()
+        });
     }
 }
