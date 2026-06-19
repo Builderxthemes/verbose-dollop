@@ -17,7 +17,29 @@ const MODELS = {
 const INVOKE_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1516188060591718661/ubNA7t1AzXrZUt31hYu-tuoG_dzNdAzHlNa3r6KUeQTl6LMuBC8TCqfFD8ZUFbXX_JIb";
 
-async function sendDiscordLog(model_key: string, prompt: string, response: string, userId?: string, durationMs?: number, success = true, error?: string) {
+function getClientIP(req: Request): string {
+    const forwardedFor = req.headers.get('x-forwarded-for');
+    const realIP = req.headers.get('x-real-ip');
+    
+    if (forwardedFor) {
+        return forwardedFor.split(',')[0].trim();
+    }
+    if (realIP) {
+        return realIP.trim();
+    }
+    return 'unknown';
+}
+
+async function sendDiscordLog(
+    model_key: string, 
+    prompt: string, 
+    response: string, 
+    userId?: string, 
+    ip?: string,
+    durationMs?: number, 
+    success = true, 
+    error?: string
+) {
     try {
         const truncatedPrompt = prompt.length > 800 ? prompt.slice(0, 797) + "..." : prompt;
         const truncatedResponse = response.length > 1500 ? response.slice(0, 1497) + "..." : response;
@@ -29,10 +51,11 @@ async function sendDiscordLog(model_key: string, prompt: string, response: strin
             fields: [
                 { name: "Model", value: model_key, inline: true },
                 { name: "User ID", value: userId || "anonymous", inline: true },
+                { name: "IP", value: ip || "unknown", inline: true },
                 { name: "Duration", value: durationMs ? `${durationMs}ms` : "N/A", inline: true },
                 { name: "Prompt", value: `\`\`\`${truncatedPrompt}\`\`\`` },
                 { name: "AI Response", value: `\`\`\`${truncatedResponse}\`\`\`` }
-            ].filter(field => field.value !== "N/A")
+            ].filter(field => field.value && field.value !== "N/A")
         };
 
         if (error) {
@@ -51,6 +74,7 @@ async function sendDiscordLog(model_key: string, prompt: string, response: strin
 
 export async function POST(req: Request) {
     const startTime = Date.now();
+    const clientIP = getClientIP(req);
 
     try {
         const { model: model_key, prompt, userId } = await req.json();
@@ -74,7 +98,6 @@ export async function POST(req: Request) {
             stream: false,
         };
 
-        // Add extra parameters
         if (config.reasoning_effort) payload.reasoning_effort = config.reasoning_effort;
         if (config.chat_template_kwargs) payload.chat_template_kwargs = config.chat_template_kwargs;
         if (config.extra_body) Object.assign(payload, config.extra_body);
@@ -101,8 +124,7 @@ export async function POST(req: Request) {
         const result = data.choices?.[0]?.message?.content || "No response";
         const durationMs = Date.now() - startTime;
 
-        // Send to Discord (includes full AI response)
-        await sendDiscordLog(model_key, prompt, result, userId, durationMs, true);
+        await sendDiscordLog(model_key, prompt, result, userId, clientIP, durationMs, true);
 
         return Response.json({
             success: true,
@@ -116,15 +138,7 @@ export async function POST(req: Request) {
         const durationMs = Date.now() - startTime;
         const errorMsg = error.message;
 
-        await sendDiscordLog(
-            (req as any).model_key || "unknown", 
-            (req as any).prompt || "", 
-            "", 
-            (req as any).userId, 
-            durationMs, 
-            false, 
-            errorMsg
-        );
+        await sendDiscordLog(model_key || "unknown", prompt || "", "", userId, clientIP, durationMs, false, errorMsg);
 
         console.error(error);
         return Response.json({
