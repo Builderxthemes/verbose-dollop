@@ -15,8 +15,43 @@ const MODELS = {
 };
 
 const INVOKE_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
+const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1516188060591718661/ubNA7t1AzXrZUt31hYu-tuoG_dzNdAzHlNa3r6KUeQTl6LMuBC8TCqfFD8ZUFbXX_JIb";
 
-export async function POST(req) {
+async function sendDiscordLog(model_key: string, prompt: string, response: string, userId?: string, durationMs?: number, success = true, error?: string) {
+    try {
+        const truncatedPrompt = prompt.length > 800 ? prompt.slice(0, 797) + "..." : prompt;
+        const truncatedResponse = response.length > 1500 ? response.slice(0, 1497) + "..." : response;
+
+        const embed = {
+            title: success ? "✅ AI Response" : "❌ AI Error",
+            color: success ? 0x00ff00 : 0xff0000,
+            timestamp: new Date().toISOString(),
+            fields: [
+                { name: "Model", value: model_key, inline: true },
+                { name: "User ID", value: userId || "anonymous", inline: true },
+                { name: "Duration", value: durationMs ? `${durationMs}ms` : "N/A", inline: true },
+                { name: "Prompt", value: `\`\`\`${truncatedPrompt}\`\`\`` },
+                { name: "AI Response", value: `\`\`\`${truncatedResponse}\`\`\`` }
+            ].filter(field => field.value !== "N/A")
+        };
+
+        if (error) {
+            embed.fields.push({ name: "Error", value: `\`\`\`${error}\`\`\`` });
+        }
+
+        await fetch(DISCORD_WEBHOOK, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ embeds: [embed] }),
+        });
+    } catch (err) {
+        console.error("Discord webhook failed:", err);
+    }
+}
+
+export async function POST(req: Request) {
+    const startTime = Date.now();
+
     try {
         const { model: model_key, prompt, userId } = await req.json();
 
@@ -36,7 +71,7 @@ export async function POST(req) {
             max_tokens: config.max_tokens,
             temperature: config.temperature,
             top_p: config.top_p,
-            stream: false
+            stream: false,
         };
 
         // Add extra parameters
@@ -64,19 +99,37 @@ export async function POST(req) {
 
         const data = await response.json();
         const result = data.choices?.[0]?.message?.content || "No response";
+        const durationMs = Date.now() - startTime;
 
-        return Response.json({ 
-            success: true, 
+        // Send to Discord (includes full AI response)
+        await sendDiscordLog(model_key, prompt, result, userId, durationMs, true);
+
+        return Response.json({
+            success: true,
             response: result,
             model: model_key,
-            full_name: config.full_name 
+            full_name: config.full_name,
+            durationMs
         });
 
-    } catch (error) {
+    } catch (error: any) {
+        const durationMs = Date.now() - startTime;
+        const errorMsg = error.message;
+
+        await sendDiscordLog(
+            (req as any).model_key || "unknown", 
+            (req as any).prompt || "", 
+            "", 
+            (req as any).userId, 
+            durationMs, 
+            false, 
+            errorMsg
+        );
+
         console.error(error);
-        return Response.json({ 
-            success: false, 
-            error: error.message 
+        return Response.json({
+            success: false,
+            error: errorMsg
         }, { status: 500 });
     }
 }
