@@ -7,76 +7,143 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"/>
   <style>
-    body { background: linear-gradient(135deg, #0f172a 0%, #1e2937 100%); }
-    .chat-bubble-user { background: #3b82f6; border-radius: 20px 20px 5px 20px; }
-    .chat-bubble-ai { background: #1e2937; border-radius: 20px 20px 20px 5px; }
-    .model-card { transition: all 0.3s ease; }
-    .model-card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0a0f1c 0%, #1a2338 100%);
+    }
+
+    .chat-container {
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+    }
+
+    .chat-bubble-user {
+      background: linear-gradient(135deg, #22d3ee, #06b6d4);
+      border-radius: 20px 20px 5px 20px;
+      box-shadow: 0 10px 15px -3px rgba(34, 211, 238, 0.3);
+    }
+    
+    .chat-bubble-ai {
+      background: #1e2937;
+      border: 1px solid #334155;
+      border-radius: 20px 20px 20px 5px;
+    }
+
+    .model-card {
+      transition: all 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
+    }
+    
+    .model-card:hover {
+      transform: translateY(-8px) scale(1.03);
+      box-shadow: 0 30px 60px -15px rgb(0 0 0 / 0.5);
+    }
+    
+    .model-card.active {
+      background: linear-gradient(135deg, #10b981, #34d399);
+      color: white;
+      transform: scale(1.02);
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.4);
+    }
+
+    .message-container {
+      animation: slideIn 0.3s ease forwards;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 20px;
+    }
   </style>
 </head>
-<body class="min-h-screen text-white font-sans">
-  <div class="max-w-7xl mx-auto p-6">
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-8">
-      <div class="flex items-center gap-4">
-        <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-cyan-500 rounded-2xl flex items-center justify-center text-3xl">
-          ⚡
+<body class="min-h-screen text-white">
+  <div class="max-w-screen-2xl mx-auto">
+    <!-- Top Navigation -->
+    <nav class="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-lg sticky top-0 z-50">
+      <div class="px-8 py-5 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <div class="w-11 h-11 bg-gradient-to-br from-cyan-400 to-emerald-500 rounded-2xl flex items-center justify-center text-3xl shadow-lg">
+            ⚡
+          </div>
+          <div>
+            <h1 class="text-3xl font-bold tracking-tighter">UltraRAM</h1>
+            <p class="text-xs text-emerald-400 -mt-1">AI Studio</p>
+          </div>
         </div>
-        <div>
-          <h1 class="text-4xl font-bold tracking-tight">UltraRAM AI</h1>
-          <p class="text-emerald-400 text-sm">All models • 8GB RAM Mode</p>
+        
+        <div class="flex items-center gap-6 text-sm">
+          <div class="flex items-center gap-2 bg-emerald-950 text-emerald-400 px-4 py-2 rounded-3xl border border-emerald-900">
+            <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+            <span class="font-medium">Powered by My API</span>
+          </div>
+          <button onclick="toggleSidebar()" class="lg:hidden text-zinc-400 hover:text-white">
+            <i class="fas fa-bars text-2xl"></i>
+          </button>
         </div>
       </div>
-      <div class="flex items-center gap-6">
-        <div id="balance" class="flex items-center gap-2 bg-zinc-900 px-6 py-3 rounded-2xl">
-          <i class="fas fa-coins text-yellow-400"></i>
-          <span class="font-semibold" id="credit-amount">100</span>
-          <span class="text-zinc-400 text-sm">credits</span>
-        </div>
-        <button onclick="claimDaily()" class="bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-2xl font-medium flex items-center gap-2">
-          <i class="fas fa-gift"></i> Daily Reward
-        </button>
-      </div>
-    </div>
+    </nav>
 
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <!-- Sidebar: Models -->
-      <div class="lg:col-span-1">
-        <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
-          <i class="fas fa-robot"></i> Models
-        </h2>
-        <div id="model-list" class="space-y-2 max-h-[75vh] overflow-y-auto pr-2"></div>
+    <div class="flex h-[calc(100vh-73px)]">
+      <!-- Sidebar -->
+      <div id="sidebar" class="w-80 border-r border-zinc-800 bg-zinc-950 flex flex-col lg:block hidden">
+        <div class="p-6">
+          <h2 class="text-xl font-semibold mb-5 flex items-center gap-3">
+            <i class="fas fa-brain text-cyan-400"></i>
+            Available Models
+          </h2>
+          
+          <div id="model-list" class="space-y-3 pr-2 custom-scroll overflow-y-auto flex-1"></div>
+        </div>
       </div>
 
-      <!-- Chat Area -->
-      <div class="lg:col-span-3 bg-zinc-950 rounded-3xl shadow-2xl flex flex-col h-[80vh]">
+      <!-- Main Chat -->
+      <div class="flex-1 flex flex-col">
         <!-- Chat Header -->
-        <div class="border-b border-zinc-800 p-5 flex items-center justify-between bg-zinc-900 rounded-t-3xl">
-          <div class="flex items-center gap-3">
-            <div id="current-model-badge" class="px-4 py-2 bg-zinc-800 rounded-2xl text-sm font-medium"></div>
+        <div class="border-b border-zinc-800 px-8 py-5 bg-zinc-900 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div id="current-model-badge" class="flex items-center gap-3 px-6 py-3 bg-zinc-800 rounded-3xl"></div>
           </div>
-          <div class="text-xs text-zinc-500">Running locally • 8GB RAM</div>
+          
+          <div class="flex items-center gap-4">
+            <div class="text-xs text-zinc-500 flex items-center gap-2">
+              <i class="fas fa-bolt"></i>
+              Ultra Fast • NVIDIA Powered
+            </div>
+          </div>
         </div>
 
-        <!-- Messages -->
-        <div id="chat-messages" class="flex-1 p-6 overflow-y-auto space-y-6 bg-[url('https://www.transparenttextures.com/patterns/dark-mosaic.png')]"></div>
+        <!-- Messages Area -->
+        <div id="chat-messages" class="flex-1 p-8 overflow-y-auto custom-scroll space-y-8 bg-[radial-gradient(#334155_0.8px,transparent_1px)] bg-[length:30px_30px]"></div>
 
-        <!-- Input -->
-        <div class="p-6 border-t border-zinc-800 bg-zinc-900 rounded-b-3xl">
-          <div class="flex gap-3">
-            <input 
-              id="prompt-input"
-              type="text" 
-              class="flex-1 bg-zinc-800 border border-zinc-700 focus:border-cyan-500 rounded-2xl px-6 py-4 text-lg outline-none transition"
-              placeholder="Ask anything... (25 credits per message)"
-              onkeypress="if(event.key === 'Enter') sendMessage()"
-            />
-            <button onclick="sendMessage()" 
-              class="bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 px-10 rounded-2xl font-semibold text-lg transition">
-              Send
-            </button>
+        <!-- Input Area -->
+        <div class="p-6 bg-zinc-900 border-t border-zinc-800">
+          <div class="max-w-4xl mx-auto">
+            <div class="flex gap-4">
+              <input 
+                id="prompt-input"
+                type="text"
+                class="flex-1 bg-zinc-800 border border-zinc-700 focus:border-cyan-500 rounded-3xl px-8 py-6 text-lg outline-none transition-all placeholder-zinc-500"
+                placeholder="Ask anything... (Shift + Enter for new line)"
+                onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"
+              />
+              <button onclick="sendMessage()" 
+                class="bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 px-10 rounded-3xl font-semibold flex items-center gap-3 transition-all active:scale-95">
+                <span>Send</span>
+                <i class="fas fa-paper-plane"></i>
+              </button>
+            </div>
+            <p class="text-center text-zinc-500 text-xs mt-4">Powered by My API • Unlimited Usage • Any Domain</p>
           </div>
-          <div class="text-center text-xs text-zinc-500 mt-3">Cost: 25 credits • All models powered by NVIDIA API</div>
         </div>
       </div>
     </div>
@@ -84,43 +151,57 @@
 
   <script>
     const MODELS = {
-      "deepseek-flash": { name: "DeepSeek V4 Flash", full: "deepseek-ai/deepseek-v4-flash" },
-      "deepseek": { name: "DeepSeek V4 Pro", full: "deepseek-ai/deepseek-v4-pro" },
-      "gemma4": { name: "Gemma 4 31B", full: "google/gemma-4-31b-it" },
-      "qwen397": { name: "Qwen 3.5 397B", full: "qwen/qwen3.5-397b-a17b" },
-      "qwen122": { name: "Qwen 3.5 122B", full: "qwen/qwen3.5-122b-a10b" },
-      "mistral": { name: "Mistral Medium 3.5", full: "mistralai/mistral-medium-3.5-128b" },
-      "mistral-small": { name: "Mistral Small 4", full: "mistralai/mistral-small-4-119b-2603" },
-      "kimi": { name: "Kimi K2.6", full: "moonshotai/kimi-k2.6" },
-      "glm": { name: "GLM 5.1", full: "z-ai/glm-5.1" },
-      "step": { name: "Step 3.7 Flash", full: "stepfun-ai/step-3.7-flash" }
+      "deepseek-flash": { name: "DeepSeek V4 Flash", full: "deepseek-ai/deepseek-v4-flash", speed: "⚡" },
+      "deepseek": { name: "DeepSeek V4 Pro", full: "deepseek-ai/deepseek-v4-pro", speed: "🚀" },
+      "gemma4": { name: "Gemma 4 31B", full: "google/gemma-4-31b-it", speed: "🌟" },
+      "qwen397": { name: "Qwen 3.5 397B", full: "qwen/qwen3.5-397b-a17b", speed: "🔥" },
+      "qwen122": { name: "Qwen 3.5 122B", full: "qwen/qwen3.5-122b-a10b", speed: "⚡" },
+      "mistral": { name: "Mistral Medium 3.5", full: "mistralai/mistral-medium-3.5-128b", speed: "🌊" },
+      "mistral-small": { name: "Mistral Small 4", full: "mistralai/mistral-small-4-119b-2603", speed: "🐆" },
+      "kimi": { name: "Kimi K2.6", full: "moonshotai/kimi-k2.6", speed: "🌙" },
+      "glm": { name: "GLM 5.1", full: "z-ai/glm-5.1", speed: "🧠" },
+      "step": { name: "Step 3.7 Flash", full: "stepfun-ai/step-3.7-flash", speed: "⚡" }
     };
 
     let currentModel = "deepseek-flash";
-    let credits = 150;
 
-    function updateBalance() {
-      document.getElementById("credit-amount").textContent = credits;
+    function updateModelBadge() {
+      const m = MODELS[currentModel];
+      document.getElementById("current-model-badge").innerHTML = `
+        <span class="text-2xl">${m.speed}</span>
+        <div>
+          <div class="font-semibold">${m.name}</div>
+          <div class="text-xs text-zinc-500">${m.full}</div>
+        </div>
+      `;
     }
 
     function renderModels() {
       const container = document.getElementById("model-list");
       container.innerHTML = "";
+
       Object.keys(MODELS).forEach(key => {
         const m = MODELS[key];
         const isActive = key === currentModel;
+
         const div = document.createElement("div");
-        div.className = `model-card p-4 rounded-2xl cursor-pointer ${isActive ? 'bg-emerald-600 text-white' : 'bg-zinc-900 hover:bg-zinc-800'}`;
+        div.className = `model-card p-5 rounded-3xl cursor-pointer ${isActive ? 'active' : 'bg-zinc-900 hover:bg-zinc-800'}`;
         div.innerHTML = `
-          <div class="font-semibold">${m.name}</div>
-          <div class="text-xs text-zinc-400 mt-1">${m.full}</div>
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="text-xl font-semibold">${m.name}</div>
+              <div class="text-xs text-zinc-400 mt-1 font-mono">${m.full}</div>
+            </div>
+            <span class="text-2xl">${m.speed}</span>
+          </div>
         `;
+        
         div.onclick = () => {
           currentModel = key;
           renderModels();
-          document.getElementById("current-model-badge").innerHTML = 
-            `${m.name} <span class="text-emerald-400 text-xs">(${key})</span>`;
+          updateModelBadge();
         };
+        
         container.appendChild(div);
       });
     }
@@ -130,73 +211,70 @@
       const prompt = input.value.trim();
       if (!prompt) return;
 
-      if (credits < 25) {
-        alert("Not enough credits! Use Daily Reward.");
-        return;
-      }
-
-      // Add user message
       addMessage("user", prompt);
-      credits -= 25;
-      updateBalance();
       input.value = "";
 
-      const thinking = addMessage("ai", "Thinking...", true);
+      const thinkingMsg = addMessage("ai", `
+        <div class="flex items-center gap-3 text-zinc-400">
+          <i class="fas fa-spinner fa-spin"></i>
+          Thinking with ${MODELS[currentModel].name}...
+        </div>
+      `, true);
 
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: currentModel, prompt })
+          body: JSON.stringify({ 
+            model: currentModel, 
+            prompt,
+            userId: "web-user"
+          })
         });
 
         const data = await res.json();
-
-        // Remove thinking message
-        thinking.remove();
+        thinkingMsg.remove();
 
         if (data.success) {
           addMessage("ai", data.response);
         } else {
-          addMessage("ai", `Error: ${data.error}`);
+          addMessage("ai", `<span class="text-red-400">Error:</span> ${data.error || "Request failed"}`);
         }
       } catch (err) {
-        thinking.remove();
-        addMessage("ai", "Failed to connect to API.");
+        thinkingMsg.remove();
+        addMessage("ai", `<span class="text-red-400">Connection error.</span> Check your API.`);
       }
     }
 
     function addMessage(role, content, isTemp = false) {
       const container = document.getElementById("chat-messages");
       const msg = document.createElement("div");
-      msg.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+      msg.className = `message-container flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+      
       msg.innerHTML = `
-        <div class="${role === 'user' ? 'chat-bubble-user text-white' : 'chat-bubble-ai text-zinc-100'} max-w-[80%] px-6 py-4">
+        <div class="${role === 'user' ? 'chat-bubble-user text-white' : 'chat-bubble-ai text-zinc-100'} max-w-[80%] px-7 py-5 text-[17px] leading-relaxed">
           ${content}
         </div>
       `;
+
       container.appendChild(msg);
       container.scrollTop = container.scrollHeight;
       return msg;
     }
 
-    function claimDaily() {
-      credits += 1500;
-      updateBalance();
-      alert("✅ Daily reward claimed! +1500 credits");
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      sidebar.classList.toggle("hidden");
     }
 
     // Initialize
     window.onload = () => {
-      updateBalance();
       renderModels();
-      document.getElementById("current-model-badge").innerHTML = 
-        `${MODELS[currentModel].name} <span class="text-emerald-400 text-xs">(${currentModel})</span>`;
-      
-      // Welcome message
+      updateModelBadge();
+
       setTimeout(() => {
-        addMessage("ai", "Hello! I'm UltraRAM AI. Choose a model from the left and start chatting. All models run with 8GB RAM.");
-      }, 800);
+        addMessage("ai", `Welcome to <strong>UltraRAM AI Studio</strong>!<br><br>Choose a model from the sidebar and start chatting.<br><span class="text-emerald-400">Powered by My API</span>`);
+      }, 500);
     };
   </script>
 </body>
